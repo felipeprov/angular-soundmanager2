@@ -8,6 +8,7 @@ ngSoundManager.factory('angularPlayer', ['$rootScope', '$log',
             volume = 90,
             trackProgress = 0,
             playlist = [];
+            playingCallback = null;
         
         return {
             /**
@@ -33,7 +34,7 @@ ngSoundManager.factory('angularPlayer', ['$rootScope', '$log',
                     },
                     defaultOptions: {
                         // set global default volume for all sound objects
-                        autoLoad: false, // enable automatic loading (otherwise .load() will call with .play())
+                        autoLoad: true, // enable automatic loading (otherwise .load() will call with .play())
                         autoPlay: false, // enable playing of file ASAP (much faster if "stream" is true)
                         from: null, // position to start playback within a sound (msec), see demo
                         loops: 1, // number of times to play the sound. Related: looping (API demo)
@@ -41,11 +42,11 @@ ngSoundManager.factory('angularPlayer', ['$rootScope', '$log',
                         multiShotEvents: false, // allow events (onfinish()) to fire for each shot, if supported.
                         onid3: null, // callback function for "ID3 data is added/available"
                         onload: null, // callback function for "load finished"
-                        onstop: null, // callback for "user stop"
+                        onstop: this.onStop, // callback for "user stop"
                         onfailure: 'nextTrack', // callback function for when playing fails
-                        onpause: null, // callback for "pause"
-                        onplay: null, // callback for "play" start
-                        onresume: null, // callback for "resume" (pause toggle)
+                        onpause: this.onPause, // callback for "pause"
+                        onplay: this.onPlay, // callback for "play" start
+                        onresume: this.onResume, // callback for "resume" (pause toggle)
                         position: null, // offset (milliseconds) to seek to within downloaded sound.
                         pan: 0, // "pan" settings, left-to-right, -100 to 100
                         stream: true, // allows playing before entire file has loaded (recommended)
@@ -94,6 +95,42 @@ ngSoundManager.factory('angularPlayer', ['$rootScope', '$log',
                     $log.debug('is supported: ' + isSupported);
                     $rootScope.$broadcast('angularPlayer:ready', true);
                 });
+            },
+
+            onStop: function(){
+                console.log('onstop');
+                if(playingCallback){
+                    playingCallback('stop');
+                }
+            },
+
+            onPlay: function(){
+                console.log('onplay');
+                var elem = angular.element(document.querySelector('[ng-app]'));
+                //get the injector.
+                var injector = elem.injector();
+                var angularPlayer = injector.get('angularPlayer');
+                if(playingCallback){
+                    playingCallback('play', angularPlayer.currentTrackData());
+                }
+            },
+
+            onPause: function(){
+                console.log('onpause');
+                if(playingCallback){
+                    playingCallback('pause');
+                }
+            },
+
+             onResume: function(){
+                console.log('onresume');
+                var elem = angular.element(document.querySelector('[ng-app]'));
+                //get the injector.
+                var injector = elem.injector();
+                var angularPlayer = injector.get('angularPlayer');
+                if(playingCallback){
+                    playingCallback('resume', angularPlayer.currentTrackData());
+                }
             },
             /**
              * To check if value is in array
@@ -271,8 +308,12 @@ ngSoundManager.factory('angularPlayer', ['$rootScope', '$log',
                         this.playTrack(soundManager.soundIDs[0]);
                     } else {
                         //breadcase not playing anything
+                        this.stop();
                         isPlaying = false;
+                        this.setCurrentTrack({});
+                        $rootScope.$broadcast('track:id', this.getCurrentTrack());
                         $rootScope.$broadcast('music:isPlaying', isPlaying);
+                        playingCallback('end');
                     }
                 }
             },
@@ -376,6 +417,9 @@ ngSoundManager.factory('angularPlayer', ['$rootScope', '$log',
             },
             isPlayingStatus: function() {
                 return isPlaying;
+            },
+            setPlayingCallback: function(f){
+                playingCallback = f;
             }
         };
     }
